@@ -16,11 +16,27 @@ app.set("view engine", "ejs")
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
 
+// when it receives a POST request to /urls it responds with a redirection to /urls/:shortURL, where shortURL is the random string we generated.
 app.post("/urls", (req, res) => {
   let shortURL = generateRandomString();
   urlDatabase[shortURL] = req.body.longURL;
   let templateVars = { shortURL: shortURL, longURL: urlDatabase[shortURL] };
-  res.render("urls_show", templateVars);
+  if (urlDatabase[shortURL]) {
+    res.render("urls_show", templateVars);
+  } else {
+    res.render("404");
+  }
+  
+});
+
+// the requests to the endpoint "/u/:shortURL" will redirect to its longURL
+app.get("/u/:shortURL", (req, res) => {
+  const longURL = urlDatabase[req.params.shortURL]
+  if (longURL) {
+    res.redirect(longURL);
+  } else {
+    res.render('404');
+  }
 });
 
 app.get("/", (req, res) => {

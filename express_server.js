@@ -11,16 +11,16 @@ function generateRandomString() {
   return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 6);
 };
 
-console.log(generateRandomString());
-
 app.set("view engine", "ejs")
 
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
 
 app.post("/urls", (req, res) => {
-  console.log(req.body);  // Log the POST request body to the console
-  res.send("Ok");         // Respond with 'Ok' (we will replace this)
+  let shortURL = generateRandomString();
+  urlDatabase[shortURL] = req.body.longURL;
+  let templateVars = { shortURL: shortURL, longURL: urlDatabase[shortURL] };
+  res.render("urls_show", templateVars);
 });
 
 app.get("/", (req, res) => {

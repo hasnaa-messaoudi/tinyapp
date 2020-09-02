@@ -29,6 +29,17 @@ app.post("/urls", (req, res) => {
   
 });
 
+//Add a POST route that removes a URL resource: POST /urls/:shortURL/delete
+
+app.post("/urls/:shortURL/delete", (req, res) => {
+  //urlDatabase[shortURL] = req.params.shortURL;
+  delete urlDatabase[req.params.shortURL];
+  let templateVars = { urls: urlDatabase };
+  res.render("urls_index", templateVars);
+  
+  
+});
+
 // the requests to the endpoint "/u/:shortURL" will redirect to its longURL
 app.get("/u/:shortURL", (req, res) => {
   const longURL = urlDatabase[req.params.shortURL]
@@ -64,7 +75,6 @@ app.get("/urls/:shortURL", (req, res) => {
   let templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
   res.render("urls_show", templateVars);
 });
-
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);

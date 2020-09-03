@@ -11,16 +11,18 @@
       </div>
     </div>
     <div>
-      <% if(username != undefined){ %>
+      <% if(user != undefined){ %>
         <form class="form-inline" action="/logout" method="POST">
-          <label>logged in as <%= username %> </label>
+          <label>logged in as <%= user.email %> </label>
           <button type="submit" class="btn btn-primary">Logout</button>
         </form>
      <% } else{ %>
-      <form class="form-inline" action="/login" method="POST">
-        <input class="form-control" type="text" name="username" >
-        <button type="submit" class="btn btn-primary">Submit</button>
-      </form>
+      <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+        <div class="navbar-nav">
+          <a class="nav-item nav-link" href="/register">Register</a>
+          <a class="nav-item nav-link" href="/login">Login</a>
+        </div>
+      </div>
       <% } %>
     </div>
     

@@ -7,8 +7,16 @@ app.set("view engine", "ejs");
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
 
-const cookieParser = require('cookie-parser');
+/** 
+ * const cookieParser = require('cookie-parser');
 app.use(cookieParser());
+*/
+const cookieSession = require('cookie-session')
+app.use(cookieSession({
+  name: 'week3day4',
+  keys: ['my-secret-dont-tell']
+}));
+
 
 const bcrypt = require('bcrypt');
 
@@ -78,10 +86,13 @@ app.post("/register", (req, res) => {
       user["password"] = bcrypt.hashSync(req.body.password, 10);
       users[user["id"]] = user;
       
-      res.cookie('user_id', user["id"]);
+      //res.cookie('user_id', user["id"]);
+      req.session.user_id = user["id"];
+
       
-      let templateVars = { urls: urlsForUser(req.cookies["user_id"]), user: user };
-    
+      //let templateVars = { urls: urlsForUser(req.cookies["user_id"]), user: user };
+      let templateVars = { urls: urlsForUser(req.session.user_id), user: user };
+      
       res.render("urls_index", templateVars);
     }
   }
@@ -99,8 +110,11 @@ app.post("/login", (req, res) => {
       res.send('E-mail cannot be found');
     } else {
       if (bcrypt.compareSync(req.body.password, user.password)) {
-        let templateVars = { urls: urlsForUser(req.cookies["user_id"]), user: user };
-        res.cookie('user_id', user["id"]);
+        // let templateVars = { urls: urlsForUser(req.cookies["user_id"]), user: user };
+        let templateVars = { urls: urlsForUser(req.session.user_id), user: user };
+        
+        //res.cookie('user_id', user["id"]);
+        req.session.user_id = user["id"];
         res.render("urls_index", templateVars);
       } else {
         res.status(403);
@@ -112,13 +126,15 @@ app.post("/login", (req, res) => {
 
 // Route to render register form
 app.get("/register", (req, res) => {
-  let templateVars = { urls: urlDatabase, user: users[req.cookies["user_id"]] };
+  //let templateVars = { urls: urlDatabase, user: users[req.cookies["user_id"]] };
+  let templateVars = { urls: urlDatabase, user: users[req.session.user_id] };
   res.render("register", templateVars);
 });
 
 // Route to render login form
 app.get("/login", (req, res) => {
-  let templateVars = { urls: urlDatabase, user: users[req.cookies["user_id"]] };
+  //let templateVars = { urls: urlDatabase, user: users[req.cookies["user_id"]] };
+  let templateVars = { urls: urlDatabase, user: users[req.session.user_id] };
   res.render("login", templateVars);
 });
 
@@ -128,9 +144,11 @@ app.post("/urls", (req, res) => {
   let shortURL = generateRandomString();
   urlDatabase[shortURL] = {};
   urlDatabase[shortURL].longURL = req.body.longURL;
-  urlDatabase[shortURL].user_id = req.cookies["user_id"];
+  // urlDatabase[shortURL].user_id = req.cookies["user_id"];
+  urlDatabase[shortURL].user_id = req.session.user_id;
   let templateVars = {
-    user: users[req.cookies["user_id"]],
+    //user: users[req.cookies["user_id"]],
+    user: users[req.session.user_id],
     shortURL: shortURL,
     longURL: urlDatabase[shortURL].longURL
   };
@@ -144,11 +162,14 @@ app.post("/urls", (req, res) => {
 
 //Add a POST route that removes a URL resource: POST /urls/:shortURL/delete
 app.post("/urls/:shortURL/delete", (req, res) => {
-  if (req.cookies["user_id"]) {
+  //if (req.cookies["user_id"]) {
+    if (req.session.user_id) {
     delete urlDatabase[req.params.shortURL];
     let templateVars = {
-      user: users[req.cookies["user_id"]],
-      urls: urlsForUser(req.cookies["user_id"])
+      //user: users[req.cookies["user_id"]],
+      user: users[req.session.user_id],
+      //urls: urlsForUser(req.cookies["user_id"])
+      urls: urlsForUser(req.session.user_id)
     };
     res.render("urls_index", templateVars);
   } else {
@@ -158,9 +179,14 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 
 // Add a POST route that updates a URL resource; POST /urls/:id
 app.post("/urls/:shortURL", (req, res) => {
-  if (req.cookies["user_id"]) {
+  //if (req.cookies["user_id"]) {
+  if (req.session.user_id) {
+    if (req.body.newLongURL) {
+      urlDatabase[req.params.shortURL].longURL = req.body.newLongURL;
+    }
     let templateVars = {
-      user: users[req.cookies["user_id"]],
+      //user: users[req.cookies["user_id"]],
+      user: users[req.session.user_id],
       shortURL: req.params.shortURL,
       longURL: urlDatabase[req.params.shortURL].longURL
     };
@@ -170,14 +196,11 @@ app.post("/urls/:shortURL", (req, res) => {
   }
 });
 
-// Add an endpoint to handle a POST to /login
-app.post("/login", (req, res) => {
-  res.redirect("urls");
-});
 
 // Add an endpoint to handle a POST to /logout
 app.post("/logout", (req, res) => {
-  res.clearCookie('user_id');
+  //res.clearCookie('user_id');
+  req.session = null;
   res.redirect("urls");
 });
 
@@ -193,9 +216,11 @@ app.get("/u/:shortURL", (req, res) => {
 
 app.get("/urls", (req, res) => {
   let templateVars = {
-    user: users[req.cookies["user_id"]],
+    //user: users[req.cookies["user_id"]],
+    user: users[req.session.user_id],
     //urls: urlDatabase
-    urls: urlsForUser(req.cookies["user_id"])
+    //urls: urlsForUser(req.cookies["user_id"])
+    urls: urlsForUser(req.session.user_id)
   };
   
   res.render("urls_index", templateVars);
@@ -203,9 +228,11 @@ app.get("/urls", (req, res) => {
 
 app.get("/urls/new", (req, res) => {
   let templateVars = {
-    user: users[req.cookies["user_id"]]
+    //user: users[req.cookies["user_id"]]
+    user: users[req.session.user_id],
   };
-  if (req.cookies["user_id"]) {
+  //if (req.cookies["user_id"]) {
+  if (req.session.user_id) {
     res.render("urls_new", templateVars);
   } else {
     res.render("login", templateVars);
@@ -214,7 +241,8 @@ app.get("/urls/new", (req, res) => {
 
 app.get("/urls/:shortURL", (req, res) => {
   let templateVars = {
-    user: users[req.cookies["user_id"]],
+    //user: users[req.cookies["user_id"]],
+    user: users[req.session.user_id],
     shortURL: req.params.shortURL,
     longURL: urlDatabase[req.params.shortURL].longURL
   };

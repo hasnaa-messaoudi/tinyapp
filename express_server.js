@@ -1,17 +1,16 @@
 const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
+const { getUserByEmail, generateRandomString } = require("./helpers");
+
 
 app.set("view engine", "ejs");
 
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
 
-/** 
- * const cookieParser = require('cookie-parser');
-app.use(cookieParser());
-*/
-const cookieSession = require('cookie-session')
+
+const cookieSession = require('cookie-session');
 app.use(cookieSession({
   name: 'week3day4',
   keys: ['my-secret-dont-tell']
@@ -25,38 +24,9 @@ const urlDatabase = {
   "9sm5xK": { longURL: "http://www.google.com",  userID: "aJ48lW" }
 };
 
-/**
-const users = {
-  "userRandomID": {
-    id: "userRandomID",
-    email: "user@example.com",
-    password: "purple-monkey-dinosaur"
-  },
- "user2RandomID": {
-    id: "user2RandomID",
-    email: "user2@example.com",
-    password: "dishwasher-funk"
-  }
-};
- */
-
 const users = {};
 
 // Helpers
-const generateRandomString = function() {
-  return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 6);
-};
-
-
-const isEmailExists = function(email, users) {
-  for (let user in users) {
-    if (email.toLowerCase().trim() === users[user].email.toLowerCase().trim()) {
-      return users[user];
-    }
-  }
-  return false;
-};
-
 const urlsForUser = function(id) {
   const urls = {};
   if (id) {
@@ -73,24 +43,31 @@ const urlsForUser = function(id) {
 // Route for submisson of registeration form
 app.post("/register", (req, res) => {
   let user = {};
+  let error = {};
   if (!req.body.email || !req.body.password) {
-    res.status(400);
-    res.send('Fill all required fields');
+    error["statusCode"] = 400;
+    error["message"] = 'Fill all required fields';
+    let templateVars = {
+      user: users[req.session.user_id],
+      error: error
+    };
+    res.render("errors", templateVars);
   } else {
-    if (isEmailExists(req.body.email, users)) {
-      res.status(400);
-      res.send('Email already exists');
+    if (getUserByEmail(req.body.email, users)) {
+      error["statusCode"] = 400;
+      error["message"] = 'Email already exists';
+      let templateVars = {
+        user: users[req.session.user_id],
+        error: error
+      };
+      res.render("errors", templateVars);
     } else {
       user["id"] = generateRandomString();
       user["email"] = req.body.email;
       user["password"] = bcrypt.hashSync(req.body.password, 10);
       users[user["id"]] = user;
-      
-      //res.cookie('user_id', user["id"]);
-      req.session.user_id = user["id"];
 
-      
-      //let templateVars = { urls: urlsForUser(req.cookies["user_id"]), user: user };
+      req.session.user_id = user["id"];
       let templateVars = { urls: urlsForUser(req.session.user_id), user: user };
       
       res.render("urls_index", templateVars);
@@ -100,42 +77,89 @@ app.post("/register", (req, res) => {
 
 // Route for submition of login form
 app.post("/login", (req, res) => {
+  let error = {};
   if (!req.body.email || !req.body.password) {
-    res.status(400);
-    res.send('Fill all required fields');
+    error["statusCode"] = 400;
+    error["message"] = 'Fill all required fields';
+    let templateVars = {
+      user: users[req.session.user_id],
+      error: error
+    };
+    res.render("errors", templateVars);
   } else {
-    let user = isEmailExists(req.body.email, users);
+    let user = getUserByEmail(req.body.email, users);
     if (!user) {
-      res.status(403);
-      res.send('E-mail cannot be found');
+      error["statusCode"] = 403;
+      error["message"] = 'E-mail cannot be found';
+      let templateVars = {
+        user: users[req.session.user_id],
+        error: error
+      };
+      res.render("errors", templateVars);
     } else {
       if (bcrypt.compareSync(req.body.password, user.password)) {
-        // let templateVars = { urls: urlsForUser(req.cookies["user_id"]), user: user };
-        let templateVars = { urls: urlsForUser(req.session.user_id), user: user };
-        
-        //res.cookie('user_id', user["id"]);
         req.session.user_id = user["id"];
+        let templateVars = {
+          user: users[req.session.user_id],
+          urls: urlsForUser(req.session.user_id)
+        };
+        
         res.render("urls_index", templateVars);
       } else {
-        res.status(403);
-        res.send('Wrong password');
+        let error = {};
+        error["statusCode"] = 403;
+        error["message"] = 'Check your Login/Password';
+        let templateVars = {
+          user: users[req.session.user_id],
+          error: error
+        };
+        res.render("errors", templateVars);
       }
     }
   }
 });
 
+
+app.get("/", (req, res) => {
+  if (req.session.user_id) {
+    let templateVars = {
+      user: users[req.session.user_id],
+      urls: urlsForUser(req.session.user_id)
+    };
+    
+    res.render("urls_index", templateVars);
+  } else {
+    let templateVars = { urls: urlDatabase, user: users[req.session.user_id] };
+    res.render("login", templateVars);
+  }
+});
+
 // Route to render register form
 app.get("/register", (req, res) => {
-  //let templateVars = { urls: urlDatabase, user: users[req.cookies["user_id"]] };
-  let templateVars = { urls: urlDatabase, user: users[req.session.user_id] };
-  res.render("register", templateVars);
+  if (req.session.user_id) {
+    let templateVars = {
+      user: users[req.session.user_id],
+      urls: urlsForUser(req.session.user_id)
+    };
+    res.render("urls_index", templateVars);
+  } else {
+    let templateVars = { urls: urlDatabase, user: users[req.session.user_id] };
+    res.render("register", templateVars);
+  }
 });
 
 // Route to render login form
 app.get("/login", (req, res) => {
-  //let templateVars = { urls: urlDatabase, user: users[req.cookies["user_id"]] };
-  let templateVars = { urls: urlDatabase, user: users[req.session.user_id] };
-  res.render("login", templateVars);
+  if (req.session.user_id) {
+    let templateVars = {
+      user: users[req.session.user_id],
+      urls: urlsForUser(req.session.user_id)
+    };
+    res.render("urls_index", templateVars);
+  } else {
+    let templateVars = { urls: urlDatabase, user: users[req.session.user_id] };
+    res.render("login", templateVars);
+  }
 });
 
 
@@ -144,10 +168,8 @@ app.post("/urls", (req, res) => {
   let shortURL = generateRandomString();
   urlDatabase[shortURL] = {};
   urlDatabase[shortURL].longURL = req.body.longURL;
-  // urlDatabase[shortURL].user_id = req.cookies["user_id"];
   urlDatabase[shortURL].user_id = req.session.user_id;
   let templateVars = {
-    //user: users[req.cookies["user_id"]],
     user: users[req.session.user_id],
     shortURL: shortURL,
     longURL: urlDatabase[shortURL].longURL
@@ -162,44 +184,52 @@ app.post("/urls", (req, res) => {
 
 //Add a POST route that removes a URL resource: POST /urls/:shortURL/delete
 app.post("/urls/:shortURL/delete", (req, res) => {
-  //if (req.cookies["user_id"]) {
-    if (req.session.user_id) {
+  if (req.session.user_id) {
     delete urlDatabase[req.params.shortURL];
     let templateVars = {
-      //user: users[req.cookies["user_id"]],
       user: users[req.session.user_id],
-      //urls: urlsForUser(req.cookies["user_id"])
       urls: urlsForUser(req.session.user_id)
     };
     res.render("urls_index", templateVars);
   } else {
-    res.send("You are not allowed to do this action\n");
+    let error = {};
+    error["statusCode"] = 403;
+    error["message"] = 'You are not allowed to do this action';
+    let templateVars = {
+      user: users[req.session.user_id],
+      error: error
+    };
+    res.render("errors", templateVars);
   }
 });
 
 // Add a POST route that updates a URL resource; POST /urls/:id
 app.post("/urls/:shortURL", (req, res) => {
-  //if (req.cookies["user_id"]) {
   if (req.session.user_id) {
     if (req.body.newLongURL) {
       urlDatabase[req.params.shortURL].longURL = req.body.newLongURL;
     }
     let templateVars = {
-      //user: users[req.cookies["user_id"]],
       user: users[req.session.user_id],
       shortURL: req.params.shortURL,
       longURL: urlDatabase[req.params.shortURL].longURL
     };
     res.render("urls_show", templateVars);
   } else {
-    res.send("You are not allowed to do this action\n");
+    let error = {};
+    error["statusCode"] = 403;
+    error["message"] = 'You are not allowed to do this action';
+    let templateVars = {
+      user: users[req.session.user_id],
+      error: error
+    };
+    res.render("errors", templateVars);
   }
 });
 
 
 // Add an endpoint to handle a POST to /logout
 app.post("/logout", (req, res) => {
-  //res.clearCookie('user_id');
   req.session = null;
   res.redirect("urls");
 });
@@ -216,10 +246,7 @@ app.get("/u/:shortURL", (req, res) => {
 
 app.get("/urls", (req, res) => {
   let templateVars = {
-    //user: users[req.cookies["user_id"]],
     user: users[req.session.user_id],
-    //urls: urlDatabase
-    //urls: urlsForUser(req.cookies["user_id"])
     urls: urlsForUser(req.session.user_id)
   };
   
@@ -228,10 +255,8 @@ app.get("/urls", (req, res) => {
 
 app.get("/urls/new", (req, res) => {
   let templateVars = {
-    //user: users[req.cookies["user_id"]]
     user: users[req.session.user_id],
   };
-  //if (req.cookies["user_id"]) {
   if (req.session.user_id) {
     res.render("urls_new", templateVars);
   } else {
@@ -240,13 +265,34 @@ app.get("/urls/new", (req, res) => {
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  let templateVars = {
-    //user: users[req.cookies["user_id"]],
-    user: users[req.session.user_id],
-    shortURL: req.params.shortURL,
-    longURL: urlDatabase[req.params.shortURL].longURL
-  };
-  res.render("urls_show", templateVars);
+  if (urlDatabase[req.params.shortURL] && req.session.user_id === urlDatabase[req.params.shortURL].user_id) {
+    if (urlDatabase[req.params.shortURL]) {
+      let templateVars = {
+        user: users[req.session.user_id],
+        shortURL: req.params.shortURL,
+        longURL: urlDatabase[req.params.shortURL].longURL
+      };
+      res.render("urls_show", templateVars);
+    } else {
+      let error = {};
+      error["statusCode"] = 400;
+      error["message"] = 'URL for the given ID does not exist';
+      let templateVars = {
+        user: users[req.session.user_id],
+        error: error
+      };
+      res.render("errors", templateVars);
+    }
+  } else {
+    let error = {};
+    error["statusCode"] = 400;
+    error["message"] = 'Access denied';
+    let templateVars = {
+      user: users[req.session.user_id],
+      error: error
+    };
+    res.render("errors", templateVars);
+  }
 });
 
 app.listen(PORT, () => {

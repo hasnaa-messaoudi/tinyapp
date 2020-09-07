@@ -1,14 +1,12 @@
 const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
-const { getUserByEmail, generateRandomString } = require("./helpers");
-
+const { getUserByEmail, generateRandomString, checkLogin } = require("./helpers");
 
 app.set("view engine", "ejs");
 
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
-
 
 const cookieSession = require('cookie-session');
 app.use(cookieSession({
@@ -121,7 +119,7 @@ app.post("/login", (req, res) => {
 
 
 app.get("/", (req, res) => {
-  if (req.session.user_id) {
+  if (checkLogin(req.session.user_id)) {
     let templateVars = {
       user: users[req.session.user_id],
       urls: urlsForUser(req.session.user_id)
@@ -136,7 +134,7 @@ app.get("/", (req, res) => {
 
 // Route to render register form
 app.get("/register", (req, res) => {
-  if (req.session.user_id) {
+  if (checkLogin(req.session.user_id)) {
     let templateVars = {
       user: users[req.session.user_id],
       urls: urlsForUser(req.session.user_id)
@@ -150,7 +148,7 @@ app.get("/register", (req, res) => {
 
 // Route to render login form
 app.get("/login", (req, res) => {
-  if (req.session.user_id) {
+  if (checkLogin(req.session.user_id)) {
     let templateVars = {
       user: users[req.session.user_id],
       urls: urlsForUser(req.session.user_id)
@@ -184,7 +182,7 @@ app.post("/urls", (req, res) => {
 
 //Add a POST route that removes a URL resource: POST /urls/:shortURL/delete
 app.post("/urls/:shortURL/delete", (req, res) => {
-  if (req.session.user_id) {
+  if (checkLogin(req.session.user_id)) {
     delete urlDatabase[req.params.shortURL];
     let templateVars = {
       user: users[req.session.user_id],
@@ -205,7 +203,7 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 
 // Add a POST route that updates a URL resource; POST /urls/:id
 app.post("/urls/:shortURL", (req, res) => {
-  if (req.session.user_id) {
+  if (checkLogin(req.session.user_id)) {
     if (req.body.newLongURL) {
       urlDatabase[req.params.shortURL].longURL = req.body.newLongURL;
     }
@@ -250,14 +248,19 @@ app.get("/urls", (req, res) => {
     urls: urlsForUser(req.session.user_id)
   };
   
-  res.render("urls_index", templateVars);
+  if (checkLogin(req.session.user_id)) {
+    res.render("urls_index", templateVars);
+  } else {
+    res.render("login", templateVars);
+  }
+  
 });
 
 app.get("/urls/new", (req, res) => {
   let templateVars = {
     user: users[req.session.user_id],
   };
-  if (req.session.user_id) {
+  if (checkLogin(req.session.user_id)) {
     res.render("urls_new", templateVars);
   } else {
     res.render("login", templateVars);
